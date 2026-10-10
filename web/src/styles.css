@@ -1,0 +1,62 @@
+:root {
+  /* Midnight Harbor */
+  --color-background: #0B1623;
+  --color-surface: #192B3B;
+  --color-brand: #D68B62;
+  --color-brand-hover: #E39C76;
+  --color-secondary: #68C4B6;
+  --color-text: #EAF1F2;
+  --color-text-muted: #A8B8C8;
+  --color-border: #32485C;
+  --color-success: #59C69A;
+  --color-warning: #F0B45A;
+  --color-critical: #F07878;
+  --color-info: #79B8F2;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--color-text);
+  background: var(--color-background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; }
+.shell { max-width: 1040px; padding: 0 40px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 32px 0; border-bottom: 1px solid var(--color-border); }
+.brand { color: inherit; text-decoration: none; font-size: 22px; font-weight: 700; letter-spacing: -0.8px; }
+.brand-dot { color: var(--color-brand); }
+.badge { color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: 5px; padding: 6px 9px; font-size: 12px; }
+main { max-width: 720px; padding: 80px 0 96px; }
+.eyebrow { color: var(--color-secondary); font-size: 12px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; margin: 0 0 20px; }
+h1 { font-size: clamp(36px, 6vw, 58px); line-height: 1.08; letter-spacing: -2px; margin: 0; font-weight: 600; }
+.intro { color: var(--color-text-muted); line-height: 1.7; font-size: 18px; max-width: 520px; margin: 22px 0 44px; }
+.panel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 24px; }
+.panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+h2 { font-size: 16px; margin: 0; font-weight: 600; }
+button { background: var(--color-brand); color: var(--color-background); border: 1px solid var(--color-brand); border-radius: 5px; padding: 8px 12px; cursor: pointer; font-size: 13px; flex-shrink: 0; }
+button:hover:enabled { background: var(--color-brand-hover); border-color: var(--color-brand-hover); }
+button:disabled { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); cursor: wait; }
+:focus-visible { outline: 2px solid var(--color-secondary); outline-offset: 4px; }
+.connection { display: flex; align-items: baseline; gap: 12px; margin-top: 24px; }
+.connection p { margin: 0; line-height: 1.6; }
+.indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-muted); flex-shrink: 0; }
+.indicator.connected { background: var(--color-success); }
+.indicator.error { background: var(--color-critical); }
+.version { color: var(--color-text-muted); font-family: ui-monospace, monospace; font-size: 12px; margin-left: 12px; }
+.connection .detail { color: var(--color-text-muted); font-size: 14px; margin-top: 8px; }
+.next { display: flex; align-items: baseline; gap: 20px; padding: 30px 0; }
+.next p { color: var(--color-text-muted); line-height: 1.7; font-size: 14px; margin: 10px 0 0; max-width: 520px; }
+footer { color: var(--color-text-muted); font-size: 12px; border-top: 1px solid var(--color-border); padding: 24px 0 32px; }
+
+@media (max-width: 600px) {
+  .shell { padding: 0 22px; }
+  .header { padding: 24px 0; }
+  main { padding: 56px 0; }
+  .panel { padding: 20px; }
+  .intro { font-size: 16px; }
+}
