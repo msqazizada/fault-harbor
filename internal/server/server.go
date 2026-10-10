@@ -1,3 +1,4 @@
+// Package server exposes the HTTP API and serves the built web interface.
 package server
 
 import (
@@ -8,21 +9,26 @@ import (
 )
 
 // NewHandler serves the API and the built frontend from the same origin.
+// Accepting fs.FS instead of a disk path lets tests supply an in-memory filesystem.
 func NewHandler(version string, assets fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	health := func(w http.ResponseWriter, r *http.Request) {
+		// JSON tags set wire-format names independently of Go's exported fields.
 		writeJSON(w, http.StatusOK, struct {
 			Status string `json:"status"`
 		}{Status: "ok"})
 	}
+	// ServeMux selects handlers by method and path; GET also accepts HEAD.
 	mux.HandleFunc("GET /health/live", health)
-	// Readiness covers this server only; no infrastructure connectors exist yet.
+	// Readiness covers this server only, independently of collector availability.
 	mux.HandleFunc("GET /health/ready", health)
 	mux.HandleFunc("GET /api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, struct {
 			Version string `json:"version"`
 		}{Version: version})
 	})
+	// Keep unknown API paths out of the frontend handler: clients expect a
+	// structured error here, not an HTML page that looks like a successful fetch.
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "endpoint not found"})
 	})
@@ -46,12 +52,15 @@ func NewHandler(version string, assets fs.FS) http.Handler {
 			return
 		}
 		if info.IsDir() {
+			// FileServer can list directories; only serve known files instead.
 			http.NotFound(w, r)
 			return
 		}
 		files.ServeHTTP(w, r)
 	})
 
+	// HandlerFunc adapts a function to the http.Handler interface. Wrapping the
+	// mux applies these headers to API, frontend, and error responses alike.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")

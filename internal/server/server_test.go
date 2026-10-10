@@ -20,7 +20,7 @@ func TestHealthAndVersion(t *testing.T) {
 	} {
 		t.Run(test.path, func(t *testing.T) {
 			response := httptest.NewRecorder()
-			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.path, nil))
+			handler.ServeHTTP(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, test.path, nil))
 			if response.Code != http.StatusOK {
 				t.Fatalf("status = %d, want 200", response.Code)
 			}
@@ -51,6 +51,7 @@ func TestStaticAndAPIBoundaries(t *testing.T) {
 		{"index", "GET", "/", assets, 200},
 		{"asset", "GET", "/assets/app.js", assets, 200},
 		{"missing asset", "GET", "/assets/missing.js", assets, 404},
+		{"encoded traversal", "GET", "/%2e%2e/go.mod", assets, 404},
 		{"no directory listing", "GET", "/assets/", assets, 404},
 		{"unknown API", "GET", "/api/v1/missing", assets, 404},
 		{"unknown health", "GET", "/health/missing", assets, 404},
@@ -59,12 +60,37 @@ func TestStaticAndAPIBoundaries(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
-			NewHandler("dev", test.files).ServeHTTP(response, httptest.NewRequest(test.method, test.path, nil))
+			NewHandler("dev", test.files).ServeHTTP(response, httptest.NewRequestWithContext(t.Context(), test.method, test.path, nil))
 			if response.Code != test.status {
 				t.Fatalf("status = %d, want %d", response.Code, test.status)
 			}
 			if strings.HasPrefix(test.path, "/api/") && strings.Contains(response.Body.String(), "<!doctype") {
 				t.Fatal("API request returned frontend HTML")
+			}
+		})
+	}
+}
+
+func TestResponseHeaders(t *testing.T) {
+	handler := NewHandler("test", fstest.MapFS{"index.html": {Data: []byte("<!doctype html>")}})
+	for _, path := range []string{"/", "/health/live", "/api/v1/version", "/api/v1/missing", "/missing.js"} {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
+			for header, want := range map[string]string{
+				"X-Content-Type-Options": "nosniff",
+				"Referrer-Policy":        "no-referrer",
+				"Cache-Control":          "no-store",
+			} {
+				if got := response.Header().Get(header); got != want {
+					t.Errorf("%s = %q, want %q", header, got, want)
+				}
+			}
+			if !strings.Contains(response.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+				t.Error("response can be embedded in an untrusted frame")
+			}
+			if strings.HasPrefix(path, "/api/") && response.Header().Get("Content-Type") != "application/json" {
+				t.Error("API responses must use the JSON content type, including errors")
 			}
 		})
 	}

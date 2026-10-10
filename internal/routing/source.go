@@ -5,11 +5,16 @@ package routing
 import (
 	"context"
 	"time"
+
+	"github.com/msqazizada/fault-harbor/internal/resource"
 )
 
 // Source is implemented by routing adapters. Collect must honor cancellation.
 // Partial results carry collection issues; an error means no usable snapshot.
 // Implementations only inspect configuration and status, never modify them.
+// Go satisfies interfaces implicitly: an adapter needs these methods, with no
+// inheritance or implements declaration. The context carries cancellation and
+// deadlines through the adapter's outbound requests.
 type Source interface {
 	Identity() SourceID
 	Collect(context.Context) (Snapshot, error)
@@ -17,17 +22,13 @@ type Source interface {
 
 // SourceID identifies one configured provider instance in one environment.
 // Provider names are identifiers, not a closed enumeration.
-type SourceID struct {
-	Environment string `json:"environment"`
-	Provider    string `json:"provider"`
-	Instance    string `json:"instance"`
-}
+type SourceID = resource.SourceID
 
-type Reference struct {
-	Source SourceID `json:"source"`
-	ID     string   `json:"id"`
-}
+// Reference identifies a resource within its configured source.
+type Reference = resource.Reference
 
+// CollectionState is a distinct string type. Constants provide known values;
+// Collect still validates it because arbitrary strings can be converted to it.
 type CollectionState string
 
 const (
@@ -35,6 +36,8 @@ const (
 	CollectionPartial  CollectionState = "partial"
 )
 
+// Snapshot contains one collection result. Its slice fields hold variable-length
+// inventories; an empty inventory alone says nothing about collection success.
 type Snapshot struct {
 	Source     SourceID        `json:"source"`
 	ObservedAt time.Time       `json:"observedAt"`
@@ -52,12 +55,15 @@ type Evidence struct {
 	ObservedAt time.Time `json:"observedAt"`
 }
 
+// Issue records a collection limitation. A nil Resource pointer means the issue
+// applies to the source as a whole; omitempty leaves that field out of JSON.
 type Issue struct {
 	Code     string     `json:"code"`
 	Message  string     `json:"message"`
 	Resource *Reference `json:"resource,omitempty"`
 }
 
+// Route links provider match expressions to zero or more backend references.
 type Route struct {
 	Ref      Reference   `json:"ref"`
 	Name     string      `json:"name"`
@@ -74,6 +80,7 @@ type Match struct {
 	Expression string `json:"expression"`
 }
 
+// Backend groups configured destinations and their collection evidence.
 type Backend struct {
 	Ref       Reference  `json:"ref"`
 	Name      string     `json:"name"`

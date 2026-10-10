@@ -15,7 +15,7 @@ diagnostic execution are not wired into the HTTP server yet.
 Traefik is the first planned routing adapter. Another provider implements the
 same interface without changing diagnostic rules or the frontend. Provider SDKs,
 authentication, API versions, and configuration parsing belong inside adapters.
-Container and network collection will have their own capability contracts;
+Container and network collection uses the separate `inventory.Source` contract;
 routing providers should not need to implement Docker operations.
 
 ## Identity and evidence
@@ -63,3 +63,23 @@ The current server binds to loopback as a secure deployment default. Remote
 collection requires explicit endpoint configuration, scoped credentials, TLS,
 timeouts, and authentication at the collection boundary. Those capabilities must
 be implemented before claiming remote collection support.
+
+## Docker inspection boundary
+
+`Docker Engine → collector → Unix socket → inspection CLI`
+
+The collector is a separate executable. Its Docker transport permits only API
+negotiation, container listing/inspection, and network listing. It projects
+provider responses into `inventory.Snapshot` before serving them. Shared resource
+identities live in `internal/resource`; routing reuses those types.
+
+The main application imports the inspection client, not the Docker adapter or
+SDK. Its shared socket volume is read-only and it has no Docker socket mount.
+The public HTTP API does not expose inventory. Socket filesystem permissions
+control access to snapshots until an authenticated remote protocol is available.
+
+Collection is a sequence of observations, not an atomic view of the Engine.
+Container deletion during inspection, timeouts, and resource limits produce
+explicit partial snapshots. A failed container listing returns a collection
+error. Absence of a health check does not establish health, and one restart
+counter cannot establish a restart loop.

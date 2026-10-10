@@ -3,6 +3,8 @@ package config
 import "testing"
 
 func TestLoad(t *testing.T) {
+	// t.Setenv restores the previous value when the test ends. Tests that mutate
+	// process-wide environment variables must not run in parallel.
 	t.Setenv("FAULTHARBOR_ADDR", "")
 	t.Setenv("FAULTHARBOR_WEB_DIR", "")
 	cfg, err := Load()
@@ -18,6 +20,8 @@ func TestLoad(t *testing.T) {
 }
 
 func TestRejectInvalidAddress(t *testing.T) {
+	// Table-driven subtests apply the same expectation to several inputs while
+	// keeping each failing case individually named in the test output.
 	for _, address := range []string{"localhost", ":0", ":65536", ":http"} {
 		t.Run(address, func(t *testing.T) {
 			t.Setenv("FAULTHARBOR_ADDR", address)

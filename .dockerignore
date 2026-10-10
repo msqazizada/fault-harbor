@@ -3,6 +3,8 @@
 bin
 web/node_modules
 web/dist
+coverage
+TODO.md
 .env*
 *.db*
 *.log

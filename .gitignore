@@ -1,6 +1,8 @@
 /bin/
 /web/node_modules/
 /web/dist/
+/coverage/
+/TODO.md
 *.tsbuildinfo
 *.log
 .env

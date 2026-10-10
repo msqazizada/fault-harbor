@@ -14,7 +14,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -27,6 +27,28 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci --prefix web
-      - run: make check
+      - name: Analyze Go code
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          args: ./cmd/... ./internal/...
+      - name: Check formatting and frontend
+        run: make fmt-check lint-web test-web
+      - name: Test Go with race detection and coverage
+        run: make coverage
+      - name: Scan for known vulnerabilities
+        run: make security
       - run: make build
       - run: docker build -t faultharbor:ci .
+      - name: Verify Docker inspection fixtures
+        run: make test-integration
+        env:
+          FAULTHARBOR_TEST_IMAGE: faultharbor:ci
+      - name: Upload Go coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14

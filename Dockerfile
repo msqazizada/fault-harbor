@@ -7,16 +7,19 @@ RUN npm run build
 
 FROM golang:1.26.9-alpine AS backend
 WORKDIR /src
-COPY go.mod ./
+COPY go.mod go.sum ./
+RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/faultharbor ./cmd/faultharbor
 
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/faultharbor-collector ./cmd/faultharbor-collector
+
 FROM alpine:3.23
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates && mkdir -p /run/faultharbor && chown 0:65532 /run/faultharbor && chmod 0750 /run/faultharbor
 WORKDIR /app
-COPY --from=backend /out/faultharbor /usr/local/bin/faultharbor
+COPY --from=backend /out/ /usr/local/bin/
 COPY --from=web /src/web/dist ./web/dist
 ENV FAULTHARBOR_ADDR=0.0.0.0:8080
 USER 65532:65532

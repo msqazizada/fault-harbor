@@ -20,6 +20,8 @@ func Collect(ctx context.Context, source Source) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("collect routing source %s: %w", identity.Instance, err)
 	}
+	// An adapter may finish at the same time as cancellation. Do not publish a
+	// result after the caller has cancelled, even if the adapter returned no error.
 	if err := ctx.Err(); err != nil {
 		return Snapshot{}, err
 	}
@@ -40,6 +42,8 @@ func Collect(ctx context.Context, source Source) (Snapshot, error) {
 			return Snapshot{}, fmt.Errorf("collection issue has an invalid resource reference")
 		}
 	}
+	// Maps act as sets here: an absent key reads as false, a seen key as true.
+	// Separate maps allow a route and backend to share the same native ID.
 	routes, backends := make(map[Reference]bool), make(map[Reference]bool)
 	for _, route := range snapshot.Routes {
 		if err := validateResource(route.Ref, route.Evidence, identity, routes); err != nil {

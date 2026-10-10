@@ -8,16 +8,22 @@ import (
 )
 
 type fixtureSource struct {
-	id       SourceID
-	snapshot Snapshot
-	err      error
-	called   bool
+	id        SourceID
+	snapshot  Snapshot
+	err       error
+	called    bool
+	onCollect func()
 }
 
 func (s *fixtureSource) Identity() SourceID { return s.id }
 
+// The pointer receiver updates the original fixture, so the test can observe
+// whether collection ran. A value receiver would only update a copied struct.
 func (s *fixtureSource) Collect(context.Context) (Snapshot, error) {
 	s.called = true
+	if s.onCollect != nil {
+		s.onCollect()
+	}
 	return s.snapshot, s.err
 }
 
@@ -62,10 +68,11 @@ func TestProviderNeutralCollectionPreservesSemantics(t *testing.T) {
 
 func TestCollectionRejectsUntrustworthySnapshots(t *testing.T) {
 	for name, mutate := range map[string]func(*fixtureSource){
-		"wrong source":           func(s *fixtureSource) { s.snapshot.Source.Instance = "another" },
-		"unknown completeness":   func(s *fixtureSource) { s.snapshot.State = "" },
-		"missing timestamp":      func(s *fixtureSource) { s.snapshot.ObservedAt = time.Time{} },
-		"partial without reason": func(s *fixtureSource) { s.snapshot.State = CollectionPartial },
+		"incomplete source identity": func(s *fixtureSource) { s.id.Environment = "" },
+		"wrong source":               func(s *fixtureSource) { s.snapshot.Source.Instance = "another" },
+		"unknown completeness":       func(s *fixtureSource) { s.snapshot.State = "" },
+		"missing timestamp":          func(s *fixtureSource) { s.snapshot.ObservedAt = time.Time{} },
+		"partial without reason":     func(s *fixtureSource) { s.snapshot.State = CollectionPartial },
 		"complete with failures": func(s *fixtureSource) {
 			s.snapshot.Issues = []Issue{{Code: "permission_denied", Message: "Backend collection denied"}}
 		},
@@ -76,12 +83,82 @@ func TestCollectionRejectsUntrustworthySnapshots(t *testing.T) {
 		"cross environment reference": func(s *fixtureSource) {
 			s.snapshot.Routes[0].Backends[0].Source.Environment = "unrelated"
 		},
+		"unscoped backend reference": func(s *fixtureSource) {
+			s.snapshot.Routes[0].Backends[0].Source.Instance = ""
+		},
+		"evidence from another resource": func(s *fixtureSource) {
+			s.snapshot.Routes[0].Evidence[0].Resource.ID = "other"
+		},
+		"evidence without timestamp": func(s *fixtureSource) {
+			s.snapshot.Routes[0].Evidence[0].ObservedAt = time.Time{}
+		},
+		"issue without explanation": func(s *fixtureSource) {
+			s.snapshot.State = CollectionPartial
+			s.snapshot.Issues = []Issue{{Code: "unsupported"}}
+		},
+		"issue in another environment": func(s *fixtureSource) {
+			ref := s.snapshot.Routes[0].Ref
+			ref.Source.Environment = "other"
+			s.snapshot.State = CollectionPartial
+			s.snapshot.Issues = []Issue{{Code: "unsupported", Message: "Unsupported match", Resource: &ref}}
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			source := newFixture("fixture", "path /app")
 			mutate(source)
 			if _, err := Collect(context.Background(), source); err == nil {
 				t.Fatal("accepted an invalid snapshot")
+			}
+		})
+	}
+}
+
+func TestCollectionCancelledDuringProviderCall(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	source := newFixture("fixture", "path /app")
+	source.onCollect = cancel
+	snapshot, err := Collect(ctx, source)
+	if !errors.Is(err, context.Canceled) || len(snapshot.Routes) != 0 {
+		t.Fatalf("published a result after cancellation: %+v, %v", snapshot, err)
+	}
+}
+
+func TestBackendCollection(t *testing.T) {
+	for _, duplicate := range []bool{false, true} {
+		name := "multiple destinations"
+		if duplicate {
+			name = "duplicate backend ID"
+		}
+		t.Run(name, func(t *testing.T) {
+			source := newFixture("fixture", "path /app")
+			route := &source.snapshot.Routes[0]
+			// Route IDs and backend IDs occupy separate namespaces.
+			backend := Backend{
+				Ref: route.Ref, Name: "application",
+				Endpoints: []Endpoint{
+					{Address: "app-1.example.com", Port: 8080, Protocol: "http"},
+					{Address: "app-2.example.com", Port: 8080, Protocol: "http"},
+				},
+				Evidence: []Evidence{{Resource: route.Ref, Locator: "backends/app", ObservedAt: source.snapshot.ObservedAt}},
+			}
+			route.Backends = []Reference{backend.Ref}
+			source.snapshot.Backends = []Backend{backend}
+			if duplicate {
+				source.snapshot.Backends = append(source.snapshot.Backends, backend)
+			}
+			snapshot, err := Collect(context.Background(), source)
+			if duplicate {
+				if err == nil {
+					t.Fatal("accepted ambiguous duplicate backends")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(snapshot.Backends) != 1 || len(snapshot.Backends[0].Endpoints) != 2 || snapshot.Routes[0].Backends[0] != backend.Ref {
+				t.Fatalf("lost backend relationships: %+v", snapshot)
 			}
 		})
 	}

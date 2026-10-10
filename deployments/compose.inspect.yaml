@@ -1,0 +1,27 @@
+# Use with: docker compose -f compose.yaml -f deployments/compose.inspect.yaml up --build -d
+services:
+  faultharbor:
+    volumes:
+      - inspection:/run/faultharbor:ro
+  collector:
+    build: .
+    entrypoint: ["faultharbor-collector"]
+    command:
+      - --environment=${FAULTHARBOR_ENVIRONMENT:?Set FAULTHARBOR_ENVIRONMENT}
+      - --source=${FAULTHARBOR_SOURCE:?Set FAULTHARBOR_SOURCE}
+    # Only this process receives Docker access. Root is needed for the default
+    # root-owned Engine socket; the shared collector socket uses group 65532.
+    user: "0:65532"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    stop_grace_period: 10s
+    healthcheck:
+      disable: true
+    volumes:
+      - ${FAULTHARBOR_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - inspection:/run/faultharbor
+volumes:
+  inspection:

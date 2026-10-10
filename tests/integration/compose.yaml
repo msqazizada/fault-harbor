@@ -1,0 +1,53 @@
+services:
+  collector:
+    image: ${FAULTHARBOR_TEST_IMAGE:-faultharbor:test}
+    entrypoint: [faultharbor-collector]
+    command: [--environment, integration, --source, fixture-engine]
+    user: "0:65532"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      disable: true
+    volumes:
+      - ${FAULTHARBOR_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - inspection:/run/faultharbor
+  consumer:
+    image: ${FAULTHARBOR_TEST_IMAGE:-faultharbor:test}
+    entrypoint: [sleep, infinity]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      disable: true
+    volumes:
+      - inspection:/run/faultharbor:ro
+  healthy:
+    image: alpine:3.23
+    command: [sleep, infinity]
+    environment:
+      FIXTURE_SECRET: must-not-appear-in-inventory
+    healthcheck:
+      test: [CMD, "true"]
+      interval: 1s
+      timeout: 1s
+      retries: 1
+  unhealthy:
+    image: alpine:3.23
+    command: [sleep, infinity]
+    healthcheck:
+      test: [CMD-SHELL, "echo must-not-appear-in-inventory; exit 1"]
+      interval: 1s
+      timeout: 1s
+      retries: 1
+  stopped:
+    image: alpine:3.23
+    command: [sh, -c, "exit 23"]
+  restarting:
+    image: alpine:3.23
+    command: [sh, -c, "exit 17"]
+    restart: always
+volumes:
+  inspection:
