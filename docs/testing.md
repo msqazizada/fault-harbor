@@ -1,6 +1,6 @@
 # Testing and analysis
 
-Install Go 1.26+, Node.js 24, and
+Install Go 1.26.9+, Node.js 24, and
 [golangci-lint v2.14.0](https://golangci-lint.run/docs/welcome/install/local/).
 Use the published binary for your operating system and verify it against the
 release checksum file. Keep the linter version aligned with CI.

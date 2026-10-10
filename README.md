@@ -32,7 +32,7 @@ permissions, and deployment details.
 
 ## Development
 
-Requires Go 1.26+, Node.js 24 LTS, and npm.
+Requires Go 1.26.9+, Node.js 24 LTS, and npm.
 
 ```sh
 npm ci --prefix web

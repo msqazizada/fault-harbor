@@ -1,6 +1,6 @@
 module github.com/msqazizada/fault-harbor
 
-go 1.26.0
+go 1.26.9
 
 require (
 	github.com/containerd/errdefs v1.0.0
