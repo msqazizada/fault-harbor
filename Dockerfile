@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}"
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/faultharbor-collector ./cmd/faultharbor-collector
 
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates && mkdir -p /run/faultharbor && chown 0:65532 /run/faultharbor && chmod 0750 /run/faultharbor
 WORKDIR /app
 COPY --from=backend /out/ /usr/local/bin/
